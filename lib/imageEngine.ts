@@ -90,7 +90,7 @@ async function convertWithSharp({
   const pipeline = sharp(inputPath, { failOnError: false, animated });
 
   if (fmt === "jpeg") {
-    await pipeline.jpeg({ quality, mozjpeg: true }).toFile(outputPath);
+    await pipeline.jpeg({ quality }).toFile(outputPath);
   } else if (fmt === "png") {
     await pipeline.png({ compressionLevel: 9, quality: { compression: quality } } as any).toFile(outputPath);
   } else if (fmt === "webp") {
