@@ -4,8 +4,24 @@ import os from "node:os";
 import { v4 as uuidv4 } from "uuid";
 import type { SessionMeta, TargetFormat, ProcessedItem, SkippedItem } from "./types";
 
-const ROOT_TEMP_DIR = path.join(os.tmpdir(), "ic-nextjs-sessions");
+const ROOT_TEMP_DIR = (() => {
+  try {
+    const override = process.env.IC_SESSION_DIR;
+    if (override) return override;
+    const isVercel =
+      !!process.env.VERCEL ||
+      !!process.env.NEXT_RUNTIME ||
+      process.env.NODE_ENV === "production";
+    if (isVercel || process.platform === "linux") {
+      return "/tmp/ic-nextjs-sessions";
+    }
+    return path.join(os.tmpdir(), "ic-nextjs-sessions");
+  } catch {
+    return "/tmp/ic-nextjs-sessions";
+  }
+})();
 const TTL_MS = 30 * 60 * 1000;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 if (!fs.existsSync(ROOT_TEMP_DIR)) {
   fs.mkdirSync(ROOT_TEMP_DIR, { recursive: true });
@@ -118,7 +134,7 @@ export function saveSessionMeta(params: {
 
 export function getSessionDir(sessionId: string): string | null {
   if (!sessionId || typeof sessionId !== "string") return null;
-  if (!/^[a-fA-F0-9-]{8,}$/.test(sessionId)) return null;
+  if (!UUID_REGEX.test(sessionId)) return null;
   const dir = path.join(ROOT_TEMP_DIR, sessionId);
   if (!fs.existsSync(dir)) return null;
   return dir;
@@ -130,7 +146,9 @@ export function getSessionMeta(sessionId: string): SessionMeta | null {
   const metaPath = path.join(dir, "meta.json");
   if (!fs.existsSync(metaPath)) return null;
   try {
-    const meta = JSON.parse(fs.readFileSync(metaPath, "utf8")) as SessionMeta;
+    const raw = fs.readFileSync(metaPath, "utf8");
+    if (!raw.trim()) return null;
+    const meta = JSON.parse(raw) as SessionMeta;
     if (Date.now() > meta.expiresAt) {
       rmrf(dir);
       return null;
@@ -138,6 +156,54 @@ export function getSessionMeta(sessionId: string): SessionMeta | null {
     return meta;
   } catch {
     return null;
+  }
+}
+
+export function getSessionMetaDiagnostic(
+  sessionId: string
+): {
+  ok: boolean;
+  root: string;
+  sessionIdValid: boolean;
+  dirExists: boolean;
+  metaExists: boolean;
+  parseOk: boolean;
+  expired: boolean;
+  meta?: SessionMeta;
+  error?: string;
+} {
+  const root = ROOT_TEMP_DIR;
+  if (!sessionId || typeof sessionId !== "string") {
+    return { ok: false, root, sessionIdValid: false, dirExists: false, metaExists: false, parseOk: false, expired: false, error: "sessionId null/bukan string" };
+  }
+  const sessionIdValid = UUID_REGEX.test(sessionId);
+  if (!sessionIdValid) {
+    return { ok: false, root, sessionIdValid: false, dirExists: false, metaExists: false, parseOk: false, expired: false, error: `format sessionId tidak valid (UUID v4 diharapkan, dapat: ${sessionId})` };
+  }
+  const dir = path.join(ROOT_TEMP_DIR, sessionId);
+  const dirExists = fs.existsSync(dir);
+  if (!dirExists) {
+    return { ok: false, root, sessionIdValid: true, dirExists: false, metaExists: false, parseOk: false, expired: false, error: `folder sesi tidak ditemukan di: ${dir}` };
+  }
+  const metaPath = path.join(dir, "meta.json");
+  const metaExists = fs.existsSync(metaPath);
+  if (!metaExists) {
+    return { ok: false, root, sessionIdValid: true, dirExists: true, metaExists: false, parseOk: false, expired: false, error: `meta.json tidak ditemukan di: ${metaPath}` };
+  }
+  try {
+    const raw = fs.readFileSync(metaPath, "utf8");
+    if (!raw.trim()) {
+      return { ok: false, root, sessionIdValid: true, dirExists: true, metaExists: true, parseOk: false, expired: false, error: "meta.json kosong" };
+    }
+    const meta = JSON.parse(raw) as SessionMeta;
+    const expired = Date.now() > meta.expiresAt;
+    if (expired) {
+      rmrf(dir);
+      return { ok: false, root, sessionIdValid: true, dirExists: true, metaExists: true, parseOk: true, expired: true, meta, error: `sesi expired (${new Date(meta.expiresAt).toISOString()})` };
+    }
+    return { ok: true, root, sessionIdValid: true, dirExists: true, metaExists: true, parseOk: true, expired: false, meta };
+  } catch (err: any) {
+    return { ok: false, root, sessionIdValid: true, dirExists: true, metaExists: true, parseOk: false, expired: false, error: `parse meta.json gagal: ${err?.message || String(err)}` };
   }
 }
 
