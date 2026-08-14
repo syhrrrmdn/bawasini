@@ -87,7 +87,7 @@ async function convertWithSharp({
   const fmt = targetSharpFormat(targetFormat);
   const inputExt = extOf(inputPath);
   const animated = inputExt === "gif" || inputExt === "webp";
-  const pipeline = sharp(inputPath, { failOnError: false, animated });
+  const pipeline = sharp(inputPath, { animated });
 
   if (fmt === "jpeg") {
     await pipeline.jpeg({ quality }).toFile(outputPath);
