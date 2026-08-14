@@ -27,23 +27,41 @@ export async function GET(
 
   const meta = getSessionMeta(sessionId);
   if (!meta) {
-    return NextResponse.json(
-      { error: "Session tidak ditemukan atau sudah kedaluwarsa." },
-      {
-        status: 404,
-        headers: {
-          "Cache-Control": "no-store, must-revalidate",
-        },
-      }
-    );
+    const accept = req.headers.get("accept") || "";
+    const isBrowserNav = req.headers.get("sec-fetch-mode") === "navigate" || accept.includes("text/html");
+    const isDirectFetch = req.headers.get("x-icnv-direct") === "1";
+    if (isDirectFetch || (!isBrowserNav && accept.includes("application/json"))) {
+      return NextResponse.json(
+        { error: "Session tidak ditemukan atau sudah kedaluwarsa." },
+        {
+          status: 404,
+          headers: { "Cache-Control": "no-store, must-revalidate" },
+        }
+      );
+    }
+    const url = new URL(req.nextUrl);
+    const redirectTo = new URL("/image-converter", url.origin);
+    redirectTo.searchParams.set("dl_error", "1");
+    redirectTo.searchParams.set("reason", "expired");
+    return NextResponse.redirect(redirectTo.toString(), 302);
   }
 
   const sessionDir = getSessionDir(sessionId);
   if (!sessionDir) {
-    return NextResponse.json(
-      { error: "Session tidak ditemukan atau sudah kedaluwarsa." },
-      { status: 404 }
-    );
+    const accept = req.headers.get("accept") || "";
+    const isBrowserNav = req.headers.get("sec-fetch-mode") === "navigate" || accept.includes("text/html");
+    const isDirectFetch = req.headers.get("x-icnv-direct") === "1";
+    if (isDirectFetch || (!isBrowserNav && accept.includes("application/json"))) {
+      return NextResponse.json(
+        { error: "Session tidak ditemukan atau sudah kedaluwarsa." },
+        { status: 404 }
+      );
+    }
+    const url = new URL(req.nextUrl);
+    const redirectTo = new URL("/image-converter", url.origin);
+    redirectTo.searchParams.set("dl_error", "1");
+    redirectTo.searchParams.set("reason", "missing_dir");
+    return NextResponse.redirect(redirectTo.toString(), 302);
   }
 
   const outputDir = path.join(sessionDir, "output");

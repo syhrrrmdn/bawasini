@@ -9,6 +9,8 @@ export interface ProcessedItem {
   engine: ImageEngine;
   sizeBefore?: number;
   sizeAfter?: number;
+  thumbBefore?: string;
+  thumbAfter?: string;
 }
 
 export interface SkippedItem {

@@ -144,13 +144,9 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
                       </p>
                       <div className="relative group">
                         <img
-                          src={`/api/preview/${sessionId}/input/${item.original}`}
+                          src={item.thumbBefore || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%239ca3af'>Preview tidak tersedia</text></svg>"}
                           alt={`Before - ${item.name}`}
                           className="max-h-52 w-full object-contain mx-auto rounded-2xl shadow-md border border-gray-200 bg-white"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src =
-                              "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%239ca3af'>Preview unavailable<br/>Klik Download</text></svg>";
-                          }}
                         />
                         <p className="text-xs text-gray-500 mt-2">
                           {formatBytes(item.sizeBefore)}
@@ -177,13 +173,9 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
                       </p>
                       <div className="relative group">
                         <img
-                          src={`/api/preview/${sessionId}/output/${item.converted}`}
+                          src={item.thumbAfter || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='%23ecfdf5'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%236b7280'>Preview tidak tersedia</text></svg>"}
                           alt={`After - ${item.name}`}
                           className="max-h-52 w-full object-contain mx-auto rounded-2xl shadow-md border border-green-200 bg-white"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src =
-                              "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='100%' height='100%' fill='%23ecfdf5'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='14' fill='%236b7280'>Preview unavailable<br/>Klik Download</text></svg>";
-                          }}
                         />
                         <p className="text-xs mt-2">
                           <span className="text-gray-500">{formatBytes(item.sizeAfter)}</span>

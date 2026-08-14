@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import JSZip from "jszip";
 import { v4 as uuidv4 } from "uuid";
+import sharp from "sharp";
 import {
   createSession,
   saveSessionMeta,
@@ -45,6 +46,29 @@ function extOf(filename: string): string {
   const dot = filename.lastIndexOf(".");
   if (dot < 0) return "";
   return filename.slice(dot + 1).toLowerCase();
+}
+
+async function makeThumbBase64(imagePath: string): Promise<string | undefined> {
+  try {
+    if (!fs.existsSync(imagePath)) return undefined;
+    const { width = 0, height = 0 } = await sharp(imagePath).metadata().catch(() => ({}));
+    if (!width || !height) return undefined;
+    const max = 400;
+    let w = max;
+    let h = Math.round((height / width) * max);
+    if (h > max) {
+      h = max;
+      w = Math.round((width / height) * max);
+    }
+    const buf = await sharp(imagePath)
+      .resize(w, h, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 58, mozjpeg: undefined as any })
+      .toBuffer();
+    return "data:image/jpeg;base64," + buf.toString("base64");
+  } catch (err) {
+    console.error("makeThumbBase64 error:", err);
+    return undefined;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -143,6 +167,8 @@ export async function POST(req: NextRequest) {
         }
 
         const sizeAfter = fs.statSync(outputPath).size;
+        const thumbBefore = await makeThumbBase64(inputPath);
+        const thumbAfter = await makeThumbBase64(outputPath);
         processed.push({
           name: img.safeName,
           original: img.safeName,
@@ -150,6 +176,8 @@ export async function POST(req: NextRequest) {
           engine,
           sizeBefore,
           sizeAfter,
+          thumbBefore,
+          thumbAfter,
         });
       } catch (err: any) {
         skipped.push({

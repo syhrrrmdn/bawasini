@@ -112,7 +112,7 @@ export default async function ResultPage({
                     </p>
                     <div className="relative group">
                       <img
-                        src={`/api/preview/${sessionId}/input/${item.original}`}
+                        src={item.thumbBefore || `/api/preview/${sessionId}/input/${item.original}`}
                         alt={`Before - ${item.name}`}
                         className="max-h-52 w-full object-contain mx-auto rounded-2xl shadow-md border border-gray-200 bg-white"
                       />
@@ -141,7 +141,7 @@ export default async function ResultPage({
                     </p>
                     <div className="relative group">
                       <img
-                        src={`/api/preview/${sessionId}/output/${item.converted}`}
+                        src={item.thumbAfter || `/api/preview/${sessionId}/output/${item.converted}`}
                         alt={`After - ${item.name}`}
                         className="max-h-52 w-full object-contain mx-auto rounded-2xl shadow-md border border-green-200 bg-white"
                       />
