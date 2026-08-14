@@ -51,7 +51,9 @@ function extOf(filename: string): string {
 async function makeThumbBase64(imagePath: string): Promise<string | undefined> {
   try {
     if (!fs.existsSync(imagePath)) return undefined;
-    const { width = 0, height = 0 } = await sharp(imagePath).metadata().catch(() => ({}));
+    const meta = await sharp(imagePath).metadata().catch(() => null) as { width?: number; height?: number } | null;
+    const width = meta?.width || 0;
+    const height = meta?.height || 0;
     if (!width || !height) return undefined;
     const max = 400;
     let w = max;

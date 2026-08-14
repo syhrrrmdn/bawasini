@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       const buffer = fs.readFileSync(item.outPath);
       const ct = contentTypeOf(targetExt);
       const safeName = encodeURIComponent(item.outName);
-      const res = new NextResponse(buffer, {
+      const res = new NextResponse(buffer as unknown as BodyInit, {
         status: 200,
         headers: {
           "Content-Type": ct,
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
     await archive.finalize();
     const zipBuffer = Buffer.concat(chunks);
     const safeZipName = encodeURIComponent(zipName);
-    const res = new NextResponse(zipBuffer, {
+    const res = new NextResponse(zipBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",

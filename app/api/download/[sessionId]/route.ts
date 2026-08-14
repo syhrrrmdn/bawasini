@@ -97,7 +97,7 @@ export async function GET(
           : "application/octet-stream";
 
       const safeFilename = encodeURIComponent(item.converted);
-      const response = new NextResponse(buffer, {
+      const response = new NextResponse(buffer as unknown as BodyInit, {
         status: 200,
         headers: {
           "Content-Type": contentType,
@@ -129,7 +129,7 @@ export async function GET(
     const zipBuffer = Buffer.concat(chunks);
 
     const safeZipName = encodeURIComponent(zipName);
-    const response = new NextResponse(zipBuffer, {
+    const response = new NextResponse(zipBuffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
