@@ -55,6 +55,20 @@ export default function ImageConverterPage() {
 
       const data = await res.json();
       if (!data?.sessionId) throw new Error("Response tidak valid");
+      const cache = {
+        ...data,
+        createdAt: Date.now(),
+      };
+      try {
+        window.localStorage.setItem(`icnv:${data.sessionId}`, JSON.stringify(cache));
+        const keys = JSON.parse(window.localStorage.getItem("icnv:__keys__") || "[]");
+        keys.push(data.sessionId);
+        while (keys.length > 10) {
+          const old = keys.shift();
+          try { window.localStorage.removeItem(`icnv:${old}`); } catch {}
+        }
+        window.localStorage.setItem("icnv:__keys__", JSON.stringify(keys));
+      } catch {}
       router.push(`/image-converter/result/${data.sessionId}`);
     } catch (err: any) {
       setError(err?.message || "Gagal memproses file");

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { getSessionMetaDiagnostic } from "@/lib/storage";
 import type { ProcessedItem } from "@/lib/types";
+import ResultFallbackClient from "./ResultFallbackClient";
 
 function formatBytes(bytes?: number): string {
   if (!bytes) return "-";
@@ -27,66 +27,26 @@ export default async function ResultPage({
   const diag = getSessionMetaDiagnostic(sessionId);
 
   if (!diag.ok) {
-    const detailLines: string[] = [];
-    detailLines.push(`Root temp dir: ${diag.root}`);
-    detailLines.push(`Session ID valid (UUID v4): ${diag.sessionIdValid ? "✅" : "❌"}`);
-    detailLines.push(`Folder sesi ada: ${diag.dirExists ? "✅" : "❌"}`);
-    detailLines.push(`meta.json ada: ${diag.metaExists ? "✅" : "❌"}`);
-    detailLines.push(`Parse meta OK: ${diag.parseOk ? "✅" : "❌"}`);
-    detailLines.push(`Expired: ${diag.expired ? "⚠️" : "Tidak"}`);
-    if (diag.error) detailLines.push(`Error: ${diag.error}`);
-    detailLines.push(`Platform: ${process.platform} | NODE_ENV: ${process.env.NODE_ENV || "development"}`);
+    const platform = process.platform;
+    const env = process.env.NODE_ENV || "development";
     const isServerless = !!process.env.VERCEL || !!process.env.NEXT_RUNTIME;
-    detailLines.push(`Serverless: ${isServerless ? "Ya" : "Tidak"}`);
 
     return (
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-3xl mx-auto mb-4">
-          <Link
-            href="/image-converter"
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 transition font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Kembali ke Image Converter
-          </Link>
-        </div>
-        <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-3xl p-8">
-          <h1 className="text-2xl font-bold text-red-600 mb-2 text-center">
-            ⚠️ Sesi Tidak Ditemukan
-          </h1>
-          <p className="text-center text-sm text-gray-500 mb-6">
-            Sesi konversi Anda tidak bisa ditemukan. Coba lakukan konversi ulang.
-          </p>
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
-            <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
-              Diagnostik (Developer Info)
-            </p>
-            <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono leading-relaxed">
-{detailLines.join("\n")}
-            </pre>
-          </div>
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/image-converter"
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-2xl shadow transition"
-            >
-              🔄 Konversi Ulang
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-6 py-3 rounded-2xl transition"
-            >
-              🏠 Dashboard
-            </Link>
-          </div>
-          <p className="text-center text-xs text-gray-400 mt-6">
-            💡 Jika Anda baru saja klik &quot;Konversi&quot; tapi langsung dapat error ini,<br />
-            kemungkinan server Vercel menghapus file /tmp saat cold start. Coba 2x konversi agar server warm.
-          </p>
-        </div>
-      </main>
+      <ResultFallbackClient
+        sessionId={sessionId}
+        serverDiagnostic={{
+          root: diag.root,
+          sessionIdValid: diag.sessionIdValid,
+          dirExists: diag.dirExists,
+          metaExists: diag.metaExists,
+          parseOk: diag.parseOk,
+          expired: diag.expired,
+          error: diag.error,
+          platform,
+          env,
+          serverless: isServerless,
+        }}
+      />
     );
   }
 
