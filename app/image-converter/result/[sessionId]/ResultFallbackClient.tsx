@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ProcessedItem, SkippedItem, TargetFormat } from "@/lib/types";
+import TwoLayerDownloadButton from "@/components/TwoLayerDownloadButton";
 
 interface CachedConvertResult {
   sessionId: string;
@@ -82,8 +83,6 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
     const totalAfter = meta.processed.reduce((s, i) => s + (i.sizeAfter || 0), 0);
     const totalSaved = totalBefore - totalAfter;
     const totalSavedPct = totalBefore > 0 ? ((totalSaved / totalBefore) * 100).toFixed(0) : 0;
-    const age = Date.now() - meta.createdAt;
-    const ageMin = Math.floor(age / 60000);
 
     return (
       <main className="min-h-screen bg-gray-50 py-8 px-4">
@@ -100,11 +99,7 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
         </div>
 
         <div className="max-w-6xl mx-auto">
-          <div className="bg-white shadow-2xl rounded-3xl p-6 md:p-8 border-2 border-amber-200">
-            <div className="bg-amber-50 border border-amber-300 text-amber-800 text-xs px-4 py-2 rounded-2xl mb-6 text-center">
-              ⚡ Mode cache lokal: File preview dan download diambil dari server yang sama. Jika gambar preview tidak muncul, klik Download langsung — file dijamin ada di server.
-              {ageMin < 30 && <span className="ml-2 opacity-75">(Data {ageMin < 1 ? "baru saja" : `${ageMin} menit lalu`})</span>}
-            </div>
+          <div className="bg-white shadow-2xl rounded-3xl p-6 md:p-8">
 
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -212,18 +207,13 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
                 🔄 Konversi Lagi
               </Link>
 
-              <a
-                href={`/api/download/${sessionId}`}
-                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-10 py-4 rounded-3xl text-lg shadow-lg shadow-green-600/20 transition active:scale-[0.99]"
-                style={{ textDecoration: "none" }}
-              >
-                ⬇️ Download {isMultiple ? "ZIP Hasil" : "File Hasil"}
-              </a>
+              <TwoLayerDownloadButton
+                sessionId={sessionId}
+                targetFormat={meta.targetFormat}
+                quality={meta.quality}
+                isMultiple={isMultiple}
+              />
             </div>
-
-            <p className="text-center text-xs text-gray-400 mt-6">
-              ⚠️ File di server akan dihapus otomatis setelah Anda download atau 30 menit
-            </p>
           </div>
         </div>
       </main>
@@ -262,9 +252,6 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
         <h1 className="text-2xl font-bold text-red-600 mb-2 text-center">
           ⚠️ Sesi Tidak Ditemukan
         </h1>
-        <p className="text-center text-sm text-gray-500 mb-6">
-          Server Vercel tidak bisa menemukan file sesi karena batasan serverless storage.
-        </p>
         <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6">
           <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
             Diagnostik Lengkap
@@ -287,9 +274,6 @@ export default function ResultFallbackClient({ sessionId, serverDiagnostic }: Pr
             🏠 Dashboard
           </Link>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-6">
-          💡 Solusi terbaik: lakukan konversi dan segera download — biasanya pada request ke-2 atau ke-3, server Vercel sudah &quot;warm&quot; dan tetap berada di instance yang sama.
-        </p>
       </div>
     </main>
   );

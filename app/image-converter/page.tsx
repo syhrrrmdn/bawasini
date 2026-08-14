@@ -3,6 +3,11 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import type { ProcessedItem, SkippedItem, TargetFormat } from "@/lib/types";
+import {
+  cacheFileForSession,
+  clearOldCacheEntries,
+  downloadTwoLayer,
+} from "@/lib/clientFileCache";
 
 interface ConvertResultClient {
   sessionId: string;
@@ -70,86 +75,24 @@ export default function ImageConverterPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const tryNormalDownload = async (resData: ConvertResultClient): Promise<boolean> => {
-    try {
-      setDlStatus({ state: "loading", msg: "Mencoba mengambil file dari sesi..." });
-      const r = await fetch(`/api/download/${resData.sessionId}`, {
-        cache: "no-store",
-        headers: { "X-ICNV-Direct": "1" },
-      });
-      if (!r.ok) return false;
-      const blob = await r.blob();
-      if (!blob || blob.size === 0) return false;
-      const cd = r.headers.get("content-disposition") || "";
-      let fn = `converted.${resData.targetFormat === "jpeg" ? "jpg" : resData.targetFormat}`;
-      const matchUtf8 = cd.match(/filename\*=UTF-8''([^;]+)/);
-      if (matchUtf8 && matchUtf8[1]) fn = decodeURIComponent(matchUtf8[1]);
-      else {
-        const matchSimple = cd.match(/filename="([^"]+)"/);
-        if (matchSimple?.[1]) fn = matchSimple[1];
-      }
-      if (resData.isMultiple && !fn.toLowerCase().endsWith(".zip")) fn += ".zip";
-      triggerBrowserDownload(blob, fn);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const tryDirectDownload = async (): Promise<boolean> => {
-    const file = pendingFileRef.current;
-    if (!file) return false;
-    try {
-      setDlStatus({ state: "loading", msg: "Menyiapkan download langsung (convert ulang in-memory)..." });
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("format", format);
-      fd.append("quality", String(quality));
-      const r = await fetch("/api/download-direct", {
-        method: "POST",
-        body: fd,
-        cache: "no-store",
-      });
-      if (!r.ok) {
-        const ct = r.headers.get("content-type") || "";
-        if (ct.includes("application/json")) {
-          const data = await r.json().catch(() => ({}));
-          if (data?.error) throw new Error(data.error);
-        }
-        throw new Error(`HTTP ${r.status}`);
-      }
-      const blob = await r.blob();
-      if (!blob || blob.size === 0) throw new Error("Response kosong");
-      const cd = r.headers.get("content-disposition") || "";
-      let fn = `converted.${format === "jpeg" ? "jpg" : format}`;
-      const m1 = cd.match(/filename\*=UTF-8''([^;]+)/);
-      if (m1?.[1]) fn = decodeURIComponent(m1[1]);
-      else {
-        const m2 = cd.match(/filename="([^"]+)"/);
-        if (m2?.[1]) fn = m2[1];
-      }
-      triggerBrowserDownload(blob, fn);
-      return true;
-    } catch (err: any) {
-      throw err;
-    }
-  };
-
   const handleDownload = async () => {
     if (!result) return;
     setDlStatus({ state: "loading", msg: "Menyiapkan file..." });
     try {
-      const ok = await tryNormalDownload(result);
+      const ok = await downloadTwoLayer({
+        sessionId: result.sessionId,
+        targetFormat: result.targetFormat,
+        quality: result.quality,
+        isMultiple: result.isMultiple,
+      });
       if (ok) {
         setDlStatus({ state: "idle" });
         return;
       }
-      const ok2 = await tryDirectDownload();
-      if (ok2) {
-        setDlStatus({ state: "idle" });
-        return;
-      }
-      setDlStatus({ state: "error", msg: "Gagal mendownload. Silakan coba konversi ulang." });
+      setDlStatus({
+        state: "error",
+        msg: "Gagal mendownload. Silakan coba konversi ulang.",
+      });
     } catch (err: any) {
       setDlStatus({
         state: "error",
@@ -206,6 +149,10 @@ export default function ImageConverterPage() {
           try { window.localStorage.removeItem(`icnv:${old}`); } catch {}
         }
         window.localStorage.setItem("icnv:__keys__", JSON.stringify(keys));
+        if (file) {
+          cacheFileForSession(data.sessionId, file).catch(() => {});
+          clearOldCacheEntries().catch(() => {});
+        }
       } catch {}
       setResult(clientResult);
     } catch (err: any) {
@@ -239,9 +186,6 @@ export default function ImageConverterPage() {
 
         <div className="max-w-6xl mx-auto">
           <div className="bg-white shadow-2xl rounded-3xl p-6 md:p-8">
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs px-4 py-2 rounded-2xl mb-6 text-center">
-              💡 Download 2 lapis: dicoba dari sesi terlebih dahulu. Jika sesi hilang (beda server), otomatis convert ulang in-memory.
-            </div>
 
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -364,9 +308,6 @@ export default function ImageConverterPage() {
                   )}
                 </button>
               </div>
-              <p className="text-center text-xs text-gray-400 max-w-2xl mx-auto mt-2">
-                💡 Jika sesi terhapus (batasan serverless), sistem otomatis convert ulang in-memory secara diam-diam lalu download — file Anda tetap dijamin bisa didapat.
-              </p>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionMetaDiagnostic } from "@/lib/storage";
 import type { ProcessedItem } from "@/lib/types";
 import ResultFallbackClient from "./ResultFallbackClient";
+import TwoLayerDownloadButton from "@/components/TwoLayerDownloadButton";
 
 function formatBytes(bytes?: number): string {
   if (!bytes) return "-";
@@ -180,18 +181,13 @@ export default async function ResultPage({
               🔄 Konversi Lagi
             </Link>
 
-            <a
-              href={`/api/download/${sessionId}`}
-              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-10 py-4 rounded-3xl text-lg shadow-lg shadow-green-600/20 transition active:scale-[0.99]"
-              style={{ textDecoration: "none" }}
-            >
-              ⬇️ Download {isMultiple ? "ZIP Hasil" : "File Hasil"}
-            </a>
+            <TwoLayerDownloadButton
+              sessionId={sessionId}
+              targetFormat={meta.targetFormat}
+              quality={meta.quality}
+              isMultiple={isMultiple}
+            />
           </div>
-
-          <p className="text-center text-xs text-gray-400 mt-6">
-            ⚠️ File di server akan dihapus otomatis setelah Anda download atau 30 menit
-          </p>
         </div>
       </div>
     </main>
