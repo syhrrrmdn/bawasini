@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card } from "@/components/Card";
 import { DataInputCard } from "@/components/DataInputCard";
 import { EndpointCard } from "@/components/EndpointCard";
+import { ImageCard } from "@/components/ImageCard";
 import { LogPanel } from "@/components/LogPanel";
 import { PreviewCard } from "@/components/PreviewCard";
 import { RunCard } from "@/components/RunCard";
@@ -26,6 +27,10 @@ export default function BulkApiSenderPage() {
     authorization: "",
     headerKey: "",
     headerValue: "",
+    imageEnabled: false,
+    imageField: "image",
+    imageUrlField: "",
+    localImageDataUri: "",
   });
 
   const [rawText, setRawText] = useState("");
@@ -60,6 +65,7 @@ export default function BulkApiSenderPage() {
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <div className="space-y-4">
             <EndpointCard config={config} setConfig={setConfig} disabled={isBusy} />
+            <ImageCard config={config} setConfig={setConfig} disabled={isBusy} />
             <DataInputCard rawText={rawText} setRawText={setRawText} disabled={isBusy} />
             <PreviewCard parsed={parsed} />
           </div>

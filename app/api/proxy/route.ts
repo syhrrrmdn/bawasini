@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { guardUrl } from "@/lib/server/hostGuard";
+
 type ProxyRequest = {
   url: string;
   method: string;
@@ -7,37 +9,6 @@ type ProxyRequest = {
   data?: unknown;
   params?: Record<string, unknown>;
 };
-
-function getAllowlist() {
-  const raw = process.env.BULK_SENDER_PROXY_ALLOWLIST ?? "";
-  return raw
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-function isAllowedHost(hostname: string, allowlist: string[]) {
-  return allowlist.some((allowed) => allowed === hostname);
-}
-
-function isBlockedHost(hostname: string) {
-  const h = hostname.trim().toLowerCase();
-  if (!h) return true;
-  if (h === "localhost" || h === "0.0.0.0" || h === "::1") return true;
-  if (h.endsWith(".local")) return true;
-
-  const ipv4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    if (a === 127) return true;
-    if (a === 10) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-  }
-
-  return false;
-}
 
 function toSearchParams(params: Record<string, unknown>) {
   const sp = new URLSearchParams();
@@ -72,38 +43,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "Field url wajib." }, { status: 400 });
   }
 
-  let targetUrl: URL;
-  try {
-    targetUrl = new URL(rawUrl);
-  } catch {
-    return NextResponse.json(
-      { message: "URL tidak valid. Pastikan formatnya seperti https://domain.com/path" },
-      { status: 400 },
-    );
+  const guarded = guardUrl(rawUrl);
+  if (!guarded.ok) {
+    return NextResponse.json({ message: guarded.message }, { status: guarded.status });
   }
 
-  const allowlist = getAllowlist();
-  const hasAllowlist = allowlist.length > 0;
-
-  if (targetUrl.protocol !== "https:" && targetUrl.protocol !== "http:") {
-    return NextResponse.json({ message: "Protocol URL harus http/https." }, { status: 400 });
-  }
-
-  if (isBlockedHost(targetUrl.hostname)) {
-    return NextResponse.json(
-      {
-        message: `Host diblokir demi keamanan: ${targetUrl.hostname}`,
-      },
-      { status: 403 },
-    );
-  }
-
-  if (hasAllowlist && !isAllowedHost(targetUrl.hostname, allowlist)) {
-    return NextResponse.json(
-      { message: `Host tidak diizinkan: ${targetUrl.hostname}` },
-      { status: 403 },
-    );
-  }
+  const targetUrl = guarded.url;
 
   const method = String(payload.method ?? "GET").toUpperCase();
   const headers = new Headers(payload.headers ?? {});

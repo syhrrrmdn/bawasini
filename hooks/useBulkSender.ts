@@ -8,6 +8,7 @@ import type {
   SenderStatus,
 } from "@/lib/bulkSender/types";
 
+import { applyImageToItem } from "@/utils/imagePayload";
 import { sleep } from "@/utils/sleep";
 
 type SendTarget = {
@@ -172,7 +173,16 @@ export function useBulkSender() {
       for (let i = 0; i < targets.length; i++) {
         const target = targets[i];
         const label = pickLabel(target.item);
-        const result = await sendOne(target, config);
+
+        let result: SendAttemptResult;
+        if (config.imageEnabled) {
+          const resolved = await applyImageToItem(target.item, config);
+          result = resolved.ok
+            ? await sendOne({ index: target.index, item: resolved.item }, config)
+            : { ok: false, message: resolved.message };
+        } else {
+          result = await sendOne(target, config);
+        }
 
         if (result.ok) {
           setSuccess((v) => v + 1);
