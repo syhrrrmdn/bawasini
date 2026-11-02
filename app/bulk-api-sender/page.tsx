@@ -28,6 +28,7 @@ export default function BulkApiSenderPage() {
     headerKey: "",
     headerValue: "",
     imageEnabled: false,
+    imageMode: "multipart",
     imageField: "image",
     imageUrlField: "",
     localImageDataUri: "",

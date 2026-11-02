@@ -8,7 +8,8 @@ import type {
   SenderStatus,
 } from "@/lib/bulkSender/types";
 
-import { applyImageToItem } from "@/utils/imagePayload";
+import { applyImageToItem, formDataFromItem, omitField } from "@/utils/imagePayload";
+import type { MultipartFile } from "@/utils/imagePayload";
 import { sleep } from "@/utils/sleep";
 
 type SendTarget = {
@@ -77,6 +78,7 @@ function normalizeEndpoint(input: string) {
 async function sendOne(
   target: SendTarget,
   config: BulkSenderConfig,
+  file?: MultipartFile,
 ): Promise<SendAttemptResult> {
   const endpoint = normalizeEndpoint(config.endpoint);
   const method = config.method;
@@ -87,6 +89,9 @@ async function sendOne(
   if (config.headerKey?.trim() && config.headerValue?.trim()) {
     upstreamHeaders[config.headerKey.trim()] = config.headerValue.trim();
   }
+
+  const activeFile = method === "GET" ? undefined : file;
+  const payloadItem = activeFile ? omitField(target.item, activeFile.field) : target.item;
 
   try {
     const useProxy = config.useProxy;
@@ -100,13 +105,16 @@ async function sendOne(
             url: endpoint,
             method,
             headers: upstreamHeaders,
-            data: method === "GET" ? undefined : target.item,
-            params: method === "GET" ? target.item : undefined,
+            data: method === "GET" ? undefined : payloadItem,
+            params: method === "GET" ? payloadItem : undefined,
+            files: activeFile ? [activeFile] : undefined,
           }
-        : method === "GET"
-          ? undefined
-          : target.item,
-      params: useProxy ? undefined : method === "GET" ? target.item : undefined,
+        : activeFile
+          ? formDataFromItem(payloadItem, activeFile)
+          : method === "GET"
+            ? undefined
+            : payloadItem,
+      params: useProxy ? undefined : method === "GET" ? payloadItem : undefined,
       validateStatus: () => true,
     });
 
@@ -178,7 +186,7 @@ export function useBulkSender() {
         if (config.imageEnabled) {
           const resolved = await applyImageToItem(target.item, config);
           result = resolved.ok
-            ? await sendOne({ index: target.index, item: resolved.item }, config)
+            ? await sendOne({ index: target.index, item: resolved.item }, config, resolved.file)
             : { ok: false, message: resolved.message };
         } else {
           result = await sendOne(target, config);

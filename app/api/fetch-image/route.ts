@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 
 import { guardUrl } from "@/lib/server/hostGuard";
 
@@ -6,32 +7,6 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_BYTES = 10 * 1024 * 1024;
-
-const EXTENSION_CONTENT_TYPES: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  jpe: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  bmp: "image/bmp",
-  svg: "image/svg+xml",
-  avif: "image/avif",
-  ico: "image/x-icon",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-};
-
-function guessContentType(targetUrl: URL, headerValue: string | null) {
-  const fromHeader = (headerValue ?? "").split(";")[0].trim().toLowerCase();
-  if (fromHeader.startsWith("image/")) return fromHeader;
-
-  const ext = targetUrl.pathname.split(".").pop()?.toLowerCase() ?? "";
-  const fromExt = EXTENSION_CONTENT_TYPES[ext];
-  if (fromExt) return fromExt;
-
-  return fromHeader || "application/octet-stream";
-}
 
 export async function POST(req: Request) {
   let body: { url?: unknown };
@@ -81,8 +56,26 @@ export async function POST(req: Request) {
     );
   }
 
-  const contentType = guessContentType(guarded.url, upstream.headers.get("content-type"));
-  const dataUri = `data:${contentType};base64,${buffer.toString("base64")}`;
+  let pngBuffer: Buffer;
+  try {
+    pngBuffer = await sharp(buffer).png().toBuffer();
+  } catch {
+    return NextResponse.json(
+      { message: "Gambar tidak dapat dikonversi ke PNG." },
+      { status: 422 },
+    );
+  }
 
-  return NextResponse.json({ dataUri, contentType, bytes: buffer.byteLength });
+  if (pngBuffer.byteLength > MAX_BYTES) {
+    return NextResponse.json(
+      { message: `Ukuran gambar setelah dikonversi melebihi batas ${Math.round(MAX_BYTES / 1024 / 1024)} MB.` },
+      { status: 413 },
+    );
+  }
+
+  return NextResponse.json({
+    dataUri: `data:image/png;base64,${pngBuffer.toString("base64")}`,
+    contentType: "image/png",
+    bytes: pngBuffer.byteLength,
+  });
 }

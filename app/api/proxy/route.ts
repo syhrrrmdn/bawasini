@@ -2,13 +2,63 @@ import { NextResponse } from "next/server";
 
 import { guardUrl } from "@/lib/server/hostGuard";
 
+type ProxyFile = {
+  field: string;
+  filename?: string;
+  contentType?: string;
+  dataUri: string;
+};
+
 type ProxyRequest = {
   url: string;
   method: string;
   headers?: Record<string, string>;
   data?: unknown;
   params?: Record<string, unknown>;
+  files?: ProxyFile[];
 };
+
+const DATA_URI_RE = /^data:([^;,]*)?(;base64)?,([\s\S]*)$/;
+
+function parseDataUri(dataUri: string) {
+  const match = DATA_URI_RE.exec(dataUri.trim());
+  if (!match) return null;
+  const contentType = match[1] || "application/octet-stream";
+  const isBase64 = Boolean(match[2]);
+  const raw = match[3];
+  const bytes = isBase64
+    ? Buffer.from(raw, "base64")
+    : Buffer.from(decodeURIComponent(raw), "binary");
+  return { contentType, bytes };
+}
+
+function buildFormData(data: unknown, files: ProxyFile[]) {
+  const form = new FormData();
+  const fields =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue;
+    form.append(key, typeof value === "string" ? value : JSON.stringify(value));
+  }
+
+  for (const file of files) {
+    if (!file?.field) continue;
+    const parsed = parseDataUri(file.dataUri ?? "");
+    if (!parsed) continue;
+    form.append(
+      file.field,
+      new Blob([new Uint8Array(parsed.bytes)], {
+        type: file.contentType || parsed.contentType,
+      }),
+      file.filename || `${file.field}.png`,
+    );
+  }
+
+  return form;
+}
 
 function toSearchParams(params: Record<string, unknown>) {
   const sp = new URLSearchParams();
@@ -58,10 +108,17 @@ export async function POST(req: Request) {
     for (const [k, v] of sp.entries()) targetUrl.searchParams.set(k, v);
   }
 
-  let body: string | undefined;
+  const files = Array.isArray(payload.files) ? payload.files : [];
+
+  let body: BodyInit | undefined;
   if (method !== "GET" && method !== "HEAD") {
-    if (!headers.has("content-type")) headers.set("content-type", "application/json");
-    body = JSON.stringify(payload.data ?? {});
+    if (files.length > 0) {
+      // Biarkan fetch menetapkan content-type + boundary multipart secara otomatis.
+      body = buildFormData(payload.data, files);
+    } else {
+      if (!headers.has("content-type")) headers.set("content-type", "application/json");
+      body = JSON.stringify(payload.data ?? {});
+    }
   }
 
   let upstream: Response;

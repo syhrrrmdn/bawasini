@@ -19,6 +19,13 @@ const DEFAULT_IMAGE_URL_KEYS = [
 
 const IMAGE_EXTENSION_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|tiff?)(\?.*)?(#.*)?$/i;
 
+export type MultipartFile = {
+  field: string;
+  filename: string;
+  contentType: string;
+  dataUri: string;
+};
+
 export function isImageDataUri(value: string) {
   return /^data:image\//i.test(value.trim());
 }
@@ -87,7 +94,7 @@ async function requestImageDataUri(url: string): Promise<string> {
   return dataUri;
 }
 
-/** Unduh gambar dari web dan ubah menjadi data URI (di-cache per URL). */
+/** Unduh gambar dari web, konversi ke PNG, dan ubah menjadi data URI (di-cache per URL). */
 export function toImageDataUri(url: string): Promise<string> {
   if (isImageDataUri(url)) return Promise.resolve(url);
 
@@ -101,12 +108,12 @@ export function toImageDataUri(url: string): Promise<string> {
 }
 
 export type ResolveImageResult =
-  | { ok: true; item: Record<string, unknown>; usedImage: boolean }
+  | { ok: true; item: Record<string, unknown>; file?: MultipartFile; usedImage: boolean }
   | { ok: false; message: string };
 
 /**
- * Siapkan item payload: jika ada URL gambar dari web, unduh dulu lalu
- * masukkan hasilnya (base64/data URI) ke field gambar yang dikonfigurasi.
+ * Siapkan item payload: jika ada URL gambar dari web, unduh dulu (dikonversi ke PNG),
+ * lalu hasilnya dimasukkan sebagai file multipart atau nilai base64 di field JSON.
  */
 export async function applyImageToItem(
   item: Record<string, unknown>,
@@ -115,20 +122,62 @@ export async function applyImageToItem(
   const targetField = config.imageField?.trim() || "image";
   const source = pickImageSource(item, config.imageUrlField);
 
+  let dataUri: string | null = null;
   if (source) {
     try {
-      const dataUri = await toImageDataUri(source);
-      return { ok: true, item: { ...item, [targetField]: dataUri }, usedImage: true };
+      dataUri = await toImageDataUri(source);
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Kesalahan tidak diketahui.";
       return { ok: false, message: `Gagal mengambil gambar dari web: ${detail}` };
     }
+  } else {
+    const localImage = config.localImageDataUri?.trim();
+    if (localImage) dataUri = localImage;
   }
 
-  const localImage = config.localImageDataUri?.trim();
-  if (localImage) {
-    return { ok: true, item: { ...item, [targetField]: localImage }, usedImage: true };
+  if (!dataUri) return { ok: true, item, usedImage: false };
+
+  if (config.imageMode === "multipart") {
+    return {
+      ok: true,
+      item,
+      file: {
+        field: targetField,
+        filename: `${targetField}.png`,
+        contentType: "image/png",
+        dataUri,
+      },
+      usedImage: true,
+    };
   }
 
-  return { ok: true, item, usedImage: false };
+  return { ok: true, item: { ...item, [targetField]: dataUri }, usedImage: true };
+}
+
+function dataUriToFile(file: MultipartFile) {
+  const base64 = file.dataUri.split(",")[1] ?? "";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], file.filename, { type: file.contentType });
+}
+
+/** Susun FormData untuk pengiriman langsung dari browser (tanpa proxy). */
+export function formDataFromItem(item: Record<string, unknown>, file: MultipartFile) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(item)) {
+    if (key === file.field) continue;
+    if (value === undefined || value === null) continue;
+    form.append(key, typeof value === "string" ? value : JSON.stringify(value));
+  }
+  form.append(file.field, dataUriToFile(file), file.filename);
+  return form;
+}
+
+/** Buang field gambar dari item agar tidak terkirim ganda saat mode multipart. */
+export function omitField(item: Record<string, unknown>, field: string) {
+  if (!(field in item)) return item;
+  const clone = { ...item };
+  delete clone[field];
+  return clone;
 }

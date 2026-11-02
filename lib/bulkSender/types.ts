@@ -1,5 +1,7 @@
 export type HttpMethod = "POST" | "PUT" | "PATCH" | "DELETE" | "GET";
 
+export type ImageSendMode = "multipart" | "json";
+
 export type BulkSenderConfig = {
   endpoint: string;
   method: HttpMethod;
@@ -10,11 +12,13 @@ export type BulkSenderConfig = {
   headerKey?: string;
   headerValue?: string;
   imageEnabled: boolean;
-  /** Nama field di payload yang akan diisi gambar (base64/data URI). */
+  /** Cara gambar dikirim: multipart/form-data (file) atau base64 di field JSON. */
+  imageMode: ImageSendMode;
+  /** Nama field gambar di payload (nama field file saat mode multipart). */
   imageField: string;
   /** Nama field di payload yang berisi URL gambar sumber (opsional; jika kosong akan dideteksi otomatis). */
   imageUrlField?: string;
-  /** Gambar lokal (data URI) sebagai fallback bila payload tidak punya URL gambar. */
+  /** Gambar lokal (data URI PNG) sebagai fallback bila payload tidak punya URL gambar. */
   localImageDataUri?: string;
 };
 
